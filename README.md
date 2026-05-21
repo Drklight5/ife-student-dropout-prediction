@@ -39,10 +39,8 @@ ife-student-dropout-prediction/
 | Atributo | Valor |
 |---|---|
 | Fuente | Instituto de Futuro de la Educación (IFE), Tec de Monterrey |
-| Observaciones | 143,326 estudiantes (50 variables) |
 | Subconjunto usado | 77,517 universitarios de pregrado |
 | Variable objetivo | `retention` (binaria: 0 = desertó, 1 = se quedó) |
-| Desbalance | 8.12% deserción / 91.88% retención |
 | Split temporal | PreTec21 (AD14–18) = entrenamiento · Tec21 (AD19–20) = prueba |
 
 Las variables con missingness notable son:
@@ -63,7 +61,7 @@ Las variables con missingness notable son:
 5. Codificación ordinal/label de variables categóricas
 6. Imputación final con `SimpleImputer(strategy='median')` ajustado solo en PreTec21
 
-### Modelos (Componente 2)
+### Modelos 
 
 | Modelo | Rol |
 |---|---|
