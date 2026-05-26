@@ -1,0 +1,149 @@
+Índice
+Índice	2
+1.0 Diseño Experimental y Decisiones	3
+1.1 Formulación Técnica del Problema (no usamos AUC)	3
+1.2 Estrategia de Manejo de Datos	5
+1.3 Estrategia de Validación	7
+1.3.1 División de datos:	7
+1.3.2 Métricas de evaluación	7
+1.3.3 Línea Base	8
+1.4 Aproximaciones Metodológicas a Explorar	9
+1.4.1 K-Means Clustering	9
+1.4.2 Regresión Logística	9
+1.4.3 Random Forest	10
+1.4.4 Diagrama de Flujo	10
+2.0 Experimentación Metodológica	11
+3.0 Análisis Principal y Validación Robusta	12
+4.0 Discusión Crítica y Limitaciones	13
+
+
+1.0 Diseño Experimental y Decisiones 
+1.1 Formulación Técnica del Problema (no usamos AUC)
+
+	
+Formulamos el problema en dos etapas complementarias. Primero, se identifican perfiles latentes de riesgo de deserción mediante algoritmos de clustering aplicados a estudiantes universitarios de las cohortes AD14-20. Posteriormente, se evalúa la capacidad predictiva de variables disponibles antes del cierre del primer semestre, excluyendo calificaciones finales, para estimar su relación con la retención estudiantil. En análisis distingue entre los regímenes PreTec21 y Tec21, con el fin de explorar si los patrones de riesgo se mantienen o se modifican tras el cambio de modelo educativo. En conjunto, el enfoque busca determinar si existe un perfil invariante de riesgo de deserción y qué factores influyen de manera consistente a la predicción de deserción. El éxito se define como:
+
+
+Los datos se segmentan primero por régimen de (PreTec21: AD14-18 y Tec21: AD19-20) y se aplica un algoritmo de clustering de forma independiente sobre cada uno para identificar perfiles latentes. Después, cada régimen se particiona 80/20 para entrenar modelos con Random Forest y Regresión Logística para  encontrar los valores SHAP, con los cuales se podrá comparar el peso predictivo de cada variable entre perfiles y regímenes con el objetivo de determinar si existe un perfil invariante de riesgo. El éxito se define como:
+
+Coherencia interna de perfiles con Silhouette score > 0.30 y Davies-Bouldin < 1.5 en ambos regímenes. 
+Persistencia de perfiles entre regímenes: al menos dos clusters con composición comparable entre PreTec21 y Tec21, conservando el ordenamiento relativo de tasas de deserción entre los perfiles definidos como “equivalentes”
+Consistencia en importancia de variables: comparación del orden de importancia de variables entre regresión logística y valores SHAP, identificando perfiles donde el ordenamiento de variables se preserve entre regímenes.
+
+
+Las asociaciones identificadas entre variables y deserción no establecen causalidad. El modelo identifica covariación sistemática, no mecanismos causales. Las recomendaciones institucionales derivadas deben tratarse como hipótesis accionables, no como intervenciones garantizadas
+
+1.2 Estrategia de Manejo de Datos 
+
+Decisión
+Opción Elegida
+Justificación
+Alternativas Consideradas
+Selección de muestra
+Cohortes AD14–AD20, nivel universitario únicamente. Se excluyen estudiantes con más del 60% de variables clave faltantes.
+La pregunta de investigación requiere representación de ambos regímenes educativos. Preparatoria y posgrado tienen dinámicas de deserción cualitativamente distintas que contaminarían los perfiles.
+Incluir todos los niveles (introduce ruido estructural); excluir cohortes tempranas AD14-16 (reduciría significativamente el conjunto PreTec21).
+División de datos
+Segmentación temporal por régimen (PreTec21: AD14–18 / Tec21: AD19–20) para clustering. Partición aleatoria 80/20 independiente dentro de cada régimen para modelos supervisados.
+La segmentación por régimen es necesaria para comparar perfiles entre contextos pedagógicos distintos. El split aleatorio dentro de cada régimen se justifica porque la pregunta central es sobre diferencia entre regímenes, no sobre predicción temporal dentro de uno; no existe una frontera temporal interna que haga relevante un split cronológico por cohorte.
+Split aleatorio global mezclando ambos regímenes (impide la comparación de perfiles entre contextos); split temporal dentro de cada régimen (no existe frontera temporal sustantiva interna que lo justifique).
+Ingeniería de variables
+Variables compuestas: apoyo_financiero_total (suma de beca y préstamo), actividades_extracurriculares (bandera binaria), educacion_padres_max (máximo nivel educativo entre ambos padres). Normalización a escala 0–1 de variables de admisión. Exclusión de calificaciones finales.
+Reduce ruido, facilita interpretación de importancia de variables y evita multicolinealidad entre variables relacionadas. Cada variable compuesta está justificada por el análisis exploratorio de la Entrega 1. La exclusión de calificaciones finales es condición necesaria para que los predictores sean comparables entre regímenes y útiles como early warning.
+Usar todas las variables originales sin composición (dificulta interpretación de importancia y aumenta riesgo de multicolinealidad).
+Desbalance de clases
+class_weight='balanced' + threshold moving. Aplicado únicamente a los modelos supervisados (Regresión Logística y Random Forest).
+El dataset presenta una tasa de deserción aproximada del 8.8% (desbalance ~11:1). Ajustar pesos y umbral permite que los modelos identifiquen correctamente la clase minoritaria sin generar observaciones sintéticas que podrían introducir perfiles de riesgo inexistentes en la realidad, distorsionando la interpretación de los valores SHAP.
+SMOTE (datos sintéticos pueden crear perfiles que no existen en el dataset real, comprometiendo la validez de los análisis de importancia de variables).
+Decisión
+Opción Elegida
+Justificación
+Alternativas Consideradas
+Missingness MNAR 
+Creación de categoría "dato no disponible" conservando el valor original cuando existe.
+El 48% de valores faltantes no es aleatorio  el dato no se reporta sistemáticamente en ciertos perfiles socioeconómicos. La nueva categoría permite al modelo aprender el patrón de ausencia sin asumir valores y sin perder la información cuando está disponible.
+Imputación por moda (distorsiona la distribución al asumir que todos los casos desconocidos pertenecen al grupo mayoritario); eliminación de registros (pérdida del 48% de datos).
+Missingness MCAR
+Imputación por mediana para variables continuas y por moda para variables categóricas.
+El patrón de ausencia es aleatorio; imputar preserva los registros sin introducir supuestos fuertes sobre la distribución subyacente.
+Eliminación de registros a coste de pérdida innecesaria de datos útiles.
+Missingness MAR 
+Construcción de variable binaria actividades_extracurriculares.
+El dato falta cuando el estudiante no participó en ninguna actividad universitaria. Imputar el número de actividades asumiría equivalencia entre ausencia del dato y participación promedio, lo cual es incorrecto. La variable binaria captura el fenómeno sustantivo relevante: integración o no integración a la vida universitaria.
+Imputación por media, no bastante distorsiona el significado del dato faltante..
+
+
+
+1.3 Estrategia de Validación
+1.3.1 División de datos:
+
+Los datos se dividen por régimen educativo PreTec21 (AD14–AD18) y Tec21 (AD19–AD20) para aplicar K-Means de forma independiente sobre cada subconjunto. Esta separación es metodológicamente necesaria puesto que ambos regímenes tienen estructuras pedagógicas distintas; agruparlos en un único conjunto produciría mezcla de perfiles que no son comparables estructuralmente, imposibilitando la identificación de un perfil invariante entre contextos.
+
+Sobre cada subconjunto resultante se aplica una partición aleatoria 80/20 para entrenar los modelos supervisados (Regresión Logística y Random Forest) de forma independiente en cada régimen. Se aplica estratificación por la variable retention en ambas particiones para preservar la proporción de la clase minoritaria en los conjuntos de entrenamiento y prueba. La partición es aleatoria porque la pregunta de investigación busca comparar el peso de variables entre regímenes, no predecir sobre cohortes futuras dentro de un mismo régimen. Aunque dentro de AD14–AD18 existe estructura temporal por cohorte, dicha variación interanual no constituye una frontera sustantiva relevante para la pregunta de investigación y su uso como criterio de split introduciría sesgo temporal innecesario dentro del análisis intra-régimen.
+1.3.2 Métricas de evaluación
+Las métricas se organizan en dos niveles según su rol en el estudio: métricas primarias que responden directamente la  pregunta de investigación planteada y métricas de control las cuales validan que los modelos tienen una señal predictiva satisfactoria.
+
+La métrica primaria es el Silhouette Score …
+El Silhouette Score evalúa cohesión interna y separación entre perfiles identificados por K-Means. Valores ≥ 0.30 se consideran evidencia de que los perfiles son estructuralmente reales y no producto del azar. Como métrica complementaria, el índice Davies-Bouldin mide compacidad interna y separación simultáneamente, confirmando desde el lado opuesto lo que indica el Silhouette: un clustering puede tener clusters bien separados pero internamente dispersos, por lo que reportar ambas métricas ofrece una imagen más completa de la calidad de los perfiles. Se requiere Silhouette ≥ 0.30 y Davies-Bouldin ≤ 1.5 en ambos regímenes para considerar los perfiles válidos.
+La concordancia en el orden de importancia de variables entre coeficientes de Regresión Logística y valores SHAP de Random Forest constituye la métrica central para evaluar invarianza. Una variable se considera estable entre regímenes si su posición relativa en el ranking de importancia varía menos del 20% entre PreTec21 y Tec21. Esta métrica responde directamente la pregunta de investigación: el interés no está en qué tan bien predice el modelo, sino en qué variables identifica consistentemente como relevantes independientemente del contexto pedagógico.
+
+Las métricas de clasificación AUC-ROC, Recall y F1-Score se reportan únicamente para verificar que los modelos supervisados capturan señal real en los datos. Un modelo con AUC-ROC < 0.60 en alguno de los regímenes invalidaría la interpretación de sus valores SHAP y coeficientes, puesto que no tendría poder discriminativo suficiente para que sus estimaciones de importancia sean confiables. El trade-off precisión-recall se resuelve priorizando Recall, dado que en el contexto institucional el costo de no identificar a un estudiante en riesgo supera al de una intervención innecesaria. Los intervalos de confianza de estas métricas se calculan mediante bootstrap no paramétrico con 1,000 iteraciones.
+1.3.3 Línea Base
+
+Se define un clasificador naive basado en la clase mayoritaria como piso mínimo de referencia: predice siempre retención, obtiene AUC-ROC = 0.50 y Recall = 0 sobre la clase minoritaria. Este clasificador establece el umbral mínimo por debajo del cual cualquier modelo carece de señal predictiva útil.
+Los modelos supervisados superan la línea base de forma significativa cuando presentan AUC-ROC mayor o igual a 0.60 en ambos regímenes. Este umbral mínimo refleja que el criterio de éxito del estudio no es maximizar desempeño predictivo, sino garantizar que los modelos tienen suficiente señal para que la importancia de variables derivada sea válida e interpretable. Un modelo que supere este umbral en ambos regímenes ofrece garantías razonables de que los rankings de variables SHAP y los coeficientes logísticos reflejan relaciones reales en los datos y no ruido.
+
+(esto fue full claude, no se que piensen)
+
+1.4 Aproximaciones Metodológicas a Explorar
+Las aproximaciones seleccionadas responden directamente a la pregunta de investigación: K-Means para identificar estructura latente sin imponer etiquetas supervisadas, Regresión Logística para cuantificar y comparar efectos lineales entre regímenes, y Random Forest para capturar interacciones no lineales y validar la estabilidad del ranking de variables mediante valores SHAP.
+
+1.4.1 K-Means Clustering 
+Se aplica K-Means de forma independiente sobre PreTec21 y Tec21 para identificar perfiles latentes de riesgo en cada régimen sin imponer etiquetas supervisadas. El k óptimo se determina combinando el método del codo y el coeficiente de Silhouette, tomando como referencia los 4 clusters identificados en el análisis exploratorio previo.
+La comparación de clusters entre regímenes responde directamente la pregunta central: ¿los perfiles de riesgo mutan o persisten ante el cambio pedagógico? Un perfil se considera invariante si cumple dos condiciones: su composición en variables clave (PNA, apoyo financiero, actividades extracurriculares) varía menos del 15% en z-score promedio entre regímenes, y su tasa de deserción asociada mantiene el mismo orden relativo entre los clusters equivalentes de cada régimen.
+El objetivo es identificar estructuras de riesgo sin asumir etiquetas previas, lo cual es consistente con un enfoque exploratorio. A diferencia de un método supervisado, el clustering permite responder si los perfiles existen de forma natural en los datos y evaluar su estabilidad entre modelos educativos sin que la etiqueta de deserción condicione la formación de los grupos. K-Means asume clusters de forma aproximadamente esférica y es sensible a la escala de variables. Ambas condiciones son manejables: las variables se estandarizan antes del clustering, y la forma esférica es una aproximación razonable dado que el análisis exploratorio de la Entrega 1 ya produjo clusters interpretables con esta técnica.
+
+K-Means no captura clusters de forma irregular ni determina automáticamente el k óptimo. Esto se mitiga comparando los resultados con clustering jerárquico aglomerativo y usando múltiples métricas de validación interna (Silhouette y Davies-Bouldin) para confirmar la estabilidad de los clusters encontrados.
+
+1.4.2 Regresión Logística
+La Regresión Logística actúa como modelo interpretable y herramienta de validación teórica. Los coeficientes con intervalos de confianza permiten cuantificar directamente cuánto cambia el efecto de cada predictor al pasar de PreTec21 a Tec21, conectando los hallazgos con los marcos teóricos de la Entrega 1. Si el coeficiente de apoyo financiero se mantiene estable entre regímenes, valida la independencia de los factores socioeconómicos respecto al diseño curricular. Si el coeficiente de actividades extracurriculares aumenta en Tec21, valida el hallazgo de la Entrega 1 donde se señala que la integración estudiantil se volvió más crítica bajo el nuevo modelo pedagógico.
+El objetivo central es explicar si existen variables con peso persistente entre regímenes, no maximizar la precisión predictiva. La Regresión Logística ofrece coeficientes directamente interpretables que permiten comparar el peso de cada predictor entre modelos educativos sin capas adicionales de aproximación, haciendo explícita la magnitud y dirección de cada efecto. Se asume linealidad en log-odds entre los predictores y la variable objetivo. Este supuesto es razonable dado que los predictores principales (PNA, apoyo financiero, NSE) son variables continuas estandarizadas sin evidencia de relaciones fuertemente no lineales en el análisis exploratorio.
+Limitaciones y mitigación. No captura interacciones entre variables por ejemplo, entre NSE y primera generación que el análisis exploratorio de la Entrega 1 identificó como relevantes. Esto se mitiga incluyendo términos de interacción explícitos para los pares de variables señalados en el análisis previo, y validando los hallazgos contra los valores SHAP del Random Forest.
+
+1.4.3 Random Forest
+
+Random Forest captura interacciones no lineales entre predictores sin asumir forma funcional, lo cual es relevante dado que la Entrega 1 demostró que el mismo predictor puede producir efectos de magnitud muy distinta según la escuela o el perfil socioeconómico del estudiante. Los valores SHAP derivados del modelo permiten recuperar interpretabilidad comparable a la de la Regresión Logística, haciendo posible comparar el peso de cada predictor entre PreTec21 y Tec21 y validar los rankings de variables de forma cruzada entre aproximaciones.
+Dado que el objetivo es explicar qué variables son consistentemente relevantes entre regímenes  y no maximizar accuracy, Random Forest permite modelar relaciones no lineales e interacciones que la Regresión Logística no captura directamente. La importancia SHAP actúa como puente entre la capacidad predictiva del modelo y la interpretabilidad necesaria para responder la pregunta de investigación. El promedio de múltiples árboles no correlacionados produce estimaciones más estables que las de un árbol individual. Este supuesto es robusto y no requiere normalidad ni linealidad en los datos de entrada.
+La importancia de variables basada en impureza puede inflarse en variables con alta cardinalidad. Esto se mitiga utilizando permutation importance como verificación del ranking derivado de SHAP, asegurando consistencia entre métricas de interpretabilidad. El riesgo de sobreajuste se controla mediante restricción de max_depth y validación cruzada durante la selección de hiperparámetros.
+
+1.4.4 Diagrama de Flujo
+
+El siguiente diagrama resume el flujo completo del experimento desde los datos crudos hasta la respuesta a la pregunta de investigación. La versión visual en formato draw.io se incluye en el apéndice del documento.
+(pasar a draw.io)
+Ahora si…
+Dataset RAW
+Filtrado de población - solo nivel universitario (AD14-20)
+Preprocessing (Hoel) / ingeniería de vars - imputaciones, variables compuestas, estandarización
+Segmentación por régimen (PreTec21 AD14-18, Tec21 AD19-20)
+K-Means independiente por regimen - identificación de perfiles latentes de riesgo
+Comparación de perfiles entre regímenes (idk, z score, ordenamiento por tasas de deserción) - Identificación de perfil invariante
+Partición 80/20 por régimen (Train/test independiente para cada uno)
+Entrenamiento de modelos - Random Forest / Regresión Logística sobre cada régimen
+Extracción de valores SHAP y coeficientes - comparación de importancia de variables entre perfiles y regímenes
+Métricas de control - AUC-ROC, Recall, F1-Score con intervalos de confianza (esto lo podemos matar si queremos ig)
+Análisis de robustez - threshold, estrategia de imputación (esta fue sugerencia d claude, idk)
+Respuesta a pregunta de investigación ¿existe un perfil invariante de riesgo entre regímenes? 
+2.0 Experimentación Metodológica
+2.1 Implementación de Aproximaciones
+2.2 Comparación Sistemática
+2.3 Documentación de Experimentos Negativos
+3.0 Análisis Principal y Validación Robusta
+3.1 Evaluación en Conjunto de Prueba
+3.2 Análisis de Interpretabilidad
+3.3 Análisis de Robustez
+3.4 Inspección Profunda de Errores
+4.0 Discusión Crítica y Limitaciones
+4.1 Interpretación de Hallazgos
+4.2 Limitaciones Metodológicas
+4.3 Implicaciones Prácticas
+4.4 Trabajo Futuro
