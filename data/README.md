@@ -1,1 +1,0 @@
-Dentro de esta carepta se colocaran elconjunto de datos junto a sus variaciones
