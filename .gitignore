@@ -221,3 +221,4 @@ __marimo__/
 /data/*.xlsx
 .DS_Store
 *.png
+*.docx
