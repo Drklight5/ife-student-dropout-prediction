@@ -1,0 +1,14 @@
+# Ver qué pasos necesitan correrse
+python run_pipeline.py --list
+
+# Correr todo (salta pasos cuya salida ya existe)
+python run_pipeline.py
+
+# Forzar re-ejecución completa
+python run_pipeline.py --force
+
+# Empezar desde un paso específico (ej. desde clustering)
+python run_pipeline.py --from 3
+
+# Correr solo el análisis estadístico
+python run_pipeline.py --only 5

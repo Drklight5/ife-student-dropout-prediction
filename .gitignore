@@ -222,3 +222,10 @@ __marimo__/
 .DS_Store
 *.png
 *.docx
+
+/data/processed/*.csv
+/data/processed/*.xlsx
+/data/processed/*.pkl
+/data/processed/*.png
+/data/processed/*.npy
+/data/processed/*.json
